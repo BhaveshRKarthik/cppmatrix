@@ -20,16 +20,20 @@
 #   define BHAVESH_CXX17_CONSTEXPR 
 # endif
 
-#endif
-
-#ifndef BHAVESH_USE_IF_DEBUG
-# if !defined(BHAVESH_NO_DEDUCE_DEBUG) && (defined(_DEBUG) || !defined(NDEBUG))
+# ifdef BHAVESH_DEBUG
+#   if BHAVESH_DEBUG
+#     define BHAVESH_USE_IF_DEBUG(...) __VA_ARGS__
+#   else
+#     define BHAVESH_USE_IF_DEBUG(...) 
+#   endif
+# elif !defined(BHAVESH_NO_DEDUCE_DEBUG) && (defined(_DEBUG) || !defined(NDEBUG))
 #   define BHAVESH_DEBUG true
 #   define BHAVESH_USE_IF_DEBUG(...) __VA_ARGS__
 # else
 #   define BHAVESH_DEBUG false
-#   define BHAVESH_USE_IF_DEBUG(...)
+#  define BHAVESH_USE_IF_DEBUG(...)
 # endif
+
 #endif
 
 #if BHAVESH_CXX_VER < 201402L
@@ -129,11 +133,11 @@ namespace bhavesh {
 		}
 #   endif
 
-		template <typename T, std::enable_if_t<std::is_trivially_default_constructible_v<T>, long> = 0>
+		template <typename T, std::enable_if_t<std::is_trivially_default_constructible<T>::valuew, long> = 0>
 		BHAVESH_CXX20_CONSTEXPR void construct_default_at(T* ptr) {
-			(construct)(ptr, T{});
+			(construct_at)(ptr, T{});
 		}
-		template <typename T, std::enable_if_t<!std::is_trivially_default_constructible_v<T>, int> = 0>
+		template <typename T, std::enable_if_t<!std::is_trivially_default_constructible<T>::value, int> = 0>
 		BHAVESH_CXX20_CONSTEXPR void construct_default_at(T* ptr) {
 			(construct_at)(ptr);
 		}
@@ -170,11 +174,11 @@ namespace bhavesh {
 				(construct_default_at)(start + size++);
 			}
 
-			template <typename X = T, std::enable_if_t<!std::is_trivially_default_constructible_v<X>, int> = 0>
+			template <typename X = T, std::enable_if_t<!std::is_trivially_default_constructible<X>::value, int> = 0>
 			BHAVESH_CXX20_CONSTEXPR void fill_default() {
 				while (size != capacity) emplace_default();
 			}
-			template <typename X = T, std::enable_if_t<std::is_trivially_default_constructible_v<X>, long> = 0>
+			template <typename X = T, std::enable_if_t<std::is_trivially_default_constructible<X>::value, long> = 0>
 			BHAVESH_CXX20_CONSTEXPR void fill_default() {
 #if BHAVESH_CXX20
 				if (std::is_constant_evaluated()) {
@@ -186,24 +190,43 @@ namespace bhavesh {
 				capacity = size;
 			}
 
-			template <typename X = T, std::enable_if_t<!std::is_trivially_default_constructible_v<X>, int> = 0>
-			BHAVESH_CXX20_CONSTEXPR void copy_from_init_list(std::initializer_list<T> il) {
-				for (std::size_t i = 0; i != il.size() && size != capacity; ++i) {
-					emplace_back(il.begin()[i]);
+			template <typename X = T, std::enable_if_t<!std::is_trivially_default_constructible<X>::value, int> = 0>
+			BHAVESH_CXX20_CONSTEXPR void insert_default_n(std::size_t s) {
+				for (std::size_t i = 0; i != s; ++i) emplace_default();
+			}
+			template <typename X = T, std::enable_if_t<std::is_trivially_default_constructible<X>::value, long> = 0>
+			BHAVESH_CXX20_CONSTEXPR void insert_default_n(std::size_t s) {
+#if BHAVESH_CXX20
+				if (std::is_constant_evaluated) {
+					for (std::size_t i = 0; i != s; ++i) emplace_default();
+					return;
+				}
+#endif
+				std::memset(static_cast<void*>(start + size), 0, s * sizeof(T));
+				size += s;
+			}
+
+
+			template <typename X = T, std::enable_if_t<!std::is_trivially_default_constructible<X>::value, int> = 0>
+			BHAVESH_CXX20_CONSTEXPR void copy_from(const T* ptr, std::size_t s) {
+				for (std::size_t i = 0; i != s && size != capacity; ++i) {
+					emplace_back(ptr[i]);
 				}
 			}
-			template <typename X = T, std::enable_if_t<std::is_trivially_default_constructible_v<X>, long> = 0>
-			BHAVESH_CXX20_CONSTEXPR void copy_from_init_list(std::initializer_list<T> il) {
+			template <typename X = T, std::enable_if_t<std::is_trivially_default_constructible<X>::value, long> = 0>
+			BHAVESH_CXX20_CONSTEXPR void copy_from(const T* ptr, std::size_t s) {
 #if BHAVESH_CXX20
 				if (std::is_constant_evaluated()) {
-					for (std::size_t i = 0; i != il.size() && size != capacity; ++i) {
-						emplace_back(il.begin()[i]);
+					for (std::size_t i = 0; i != s && size != capacity; ++i) {
+						emplace_back(ptr[i]);
 					}
 					return;
 				}
 #endif
-				std::memcpy(start + size, il.begin(), std::min(capacity - il.size() - size, il.size()) * sizeof(T));
+				std::memcpy(static_cast<void*>(start + size), static_cast<const void*>(ptr), std::min(capacity - size, il.size()) * sizeof(T));
 			}
+
+
 
 			template<bool suppress_check=!BHAVESH_DEBUG>
 			BHAVESH_CXX20_CONSTEXPR T* release() {
@@ -274,16 +297,16 @@ namespace bhavesh {
 			}
 
 		public:
-			template <typename X = T, std::enable_if_t<!std::is_trivially_default_constructible_v<X>, int> = 0>
+			template <typename X = T, std::enable_if_t<!std::is_trivially_default_constructible<X>::value, int> = 0>
 			BHAVESH_CXX20_CONSTEXPR void fill_default() {
 				_fill_default();
 			}
-			template <typename X = T, std::enable_if_t<std::is_trivially_default_constructible_v<X>, long> = 0>
+			template <typename X = T, std::enable_if_t<std::is_trivially_default_constructible<X>::value, long> = 0>
 			BHAVESH_CXX20_CONSTEXPR void fill_default() {
 #if BHAVESH_CXX20
 				if (std::is_constant_evaluated()) {
 					_fill_default();
-					return
+					return;
 				}
 #endif
 				for (std::size_t x = 0; x != i; ++i) {
@@ -300,10 +323,14 @@ namespace bhavesh {
 				i = 0; j = n;
 			}
 
-			BHAVESH_CXX20_CONSTEXPR void copy_from_init_list(std::initializer_list<T> il) {
-				for (std::size_t x = 0; x != il.size() && j != n; ++x) {
-					emplace_back(il.begin()[x]);
+			BHAVESH_CXX20_CONSTEXPR void copy_from(const T* ptr, std::size_t s) {
+				for (std::size_t x = 0; x != s && j != n; ++x) {
+					emplace_back(ptr[x]);
 				}
+			}
+
+			BHAVESH_CXX20_CONSTEXPR void insert_default_n(std::size_t s) {
+				for (std::size_t i = 0; i != s; ++i) emplace_default();
 			}
 
 			template<bool suppress_check = !BHAVESH_DEBUG>
@@ -348,10 +375,114 @@ namespace bhavesh {
 			holder<T> h(m, n);
 			if BHAVESH_CXX17_CONSTEXPR (sil & silence_t::silence_less == 0) if (il.size() < m * n) throw std::invalid_argument( "too few arguments given to matrix(m, n, { ... })");
 			if BHAVESH_CXX17_CONSTEXPR (sil & silence_t::silence_more == 0) if (il.size() > m * n) throw std::invalid_argument("too many arguments given to matrix(m, n, { ... })");
-			h.copy_from_init_list(il);
+			h.copy_from(il.begin(), il.size());
 			h.fill_default();
 			return h.release<true>();
 		}
+
+		template <template<typename>typename holder, typename T>
+		BHAVESH_CXX20_CONSTEXPR T* create_from_matrix(std::size_t m, std::size_t n, T* mat) {
+			holder<T> h(m, n);
+			h.copy_from(mat, m*n);
+			return h.release<true>();
+		}
+
+		template <silence_t sil, bool is_transpose, typename T>
+		BHAVESH_CXX20_CONSTEXPR T* create_from_ilil(std::size_t m, std::size_t n, std::initializer_list<std::initializer_list<T>> il) {
+			std::conditional_t<is_transpose, _construction_holder_transpose<T>, _construction_holder<T>> h(m, n);
+			if BHAVESH_CXX17_CONSTEXPR(is_transpose) std::swap(m, n);
+			if BHAVESH_CXX17_CONSTEXPR(sil & silence_t::silence_less == 0) if (il.size() < n) throw std::invalid_argument("too few arguments given to matrix(m, n, { ... })");
+			if BHAVESH_CXX17_CONSTEXPR(sil & silence_t::silence_more == 0) if (il.size() > n) throw std::invalid_argument("too many arguments given to matrix(m, n, { ... })");
+			for (std::size_t i = 0; i != m && i != il.size(); ++i) {
+				auto& il2 = il.begin()[i];
+				h.copy_from(il2.begin(), std::min(il.size(), n));
+				h.insert_default_n(std::max(n-il.size(), std::size_t(0)));
+			}
+			h.fill_default();
+			return h.release<true>();
+		}
+
+#		if BHAVESH_CXX20
+		/*  ranges based constructors  */
+		
+		template<silence_t sil, bool fill_all, typename T, template <typename> typename holder, std::ranges::input_range R>
+		constexpr inline void take_n_from(holder<T>& h, std::size_t n, R&& rng) requires std::convertible_to<std::ranges::range_reference_t<R>, T> {
+			if constexpr (std::ranges::sized_range<R>) {
+				const std::size_t x = std::ranges::size(rng);
+				if constexpr ((sil & silence_t::silence_less) == 0) if (x < n) throw std::invalid_argument( "too few arguments given to matrix(from_range, m, n, { ... })");
+				if constexpr ((sil & silence_t::silence_more) == 0) if (x > n) throw std::invalid_argument("too many arguments given to matrix(from_range, m, n, { ... })");
+				std::size_t i = 0;
+				for (auto&& v : rng) {
+					if (i == n) break;
+					h.emplace_back(std::forward<std::ranges::range_reference_t<R>>(v));
+					i++;
+				}
+				if constexpr (fill_all) h.fill_default();
+				else                    h.insert_default_n(n - i);
+			}
+			else {
+				std::size_t i = 0;
+				for (auto&& v : rng) {
+					if (i == n) {
+						if constexpr ((sil & silence_t::silence_more) == 0) {
+							throw std::invalid_argument("too many arguments given to matrix(from_range, m, n, { ... })");
+						}
+						break;
+					}
+					h.emplace_back(std::forward<std::ranges::range_reference_t<R>>(v));
+					i++;
+				}
+
+				if constexpr ((sil & silence_t::silence_less) == 0) if (x < n) throw std::invalid_argument("too few arguments given to matrix(from_range, m, n, { ... })");
+
+				if constexpr (fill_all) h.fill_default();
+				else                    h.insert_default_n(n - i);
+			}
+		}
+
+		template<silence_t sil, typename T, template <typename> typename holder, std::ranges::input_range R>
+		constexpr inline T* create_from_range(std::size_t m, std::size_t n, R&& rng) requires std::convertible_to<std::ranges::range_reference_t<R>, T> {
+			holder<T> h(m, n);
+			take_n_from<sil, true>(h, m * n, std::forward<R>(rng));
+			return h.release<true>();
+		}
+
+		template<silence_t sil, bool is_transpose, typename T, std::ranges::input_range R>
+		constexpr inline T* create_from_range_range(std::size_t m, std::size_t n, R&& rng) 
+			requires std::ranges::input_range<std::ranges::range_reference_t<R>> && 
+			std::convertible_to<std::ranges::range_reference_t<std::ranges::range_reference_t<R>>, T> {
+
+			std::conditional_t<is_transpose, _construction_holder_transpose<T>, _construction_holder<T>> h(m, n);
+			if constexpr (is_transpose) std::swap(m, n);
+
+			if constexpr (std::ranges::sized_range<R>) {
+				const std::size_t x = std::ranges::size(rng);
+				if constexpr ((sil & silence_t::silence_less) == 0) if (x < m) throw std::invalid_argument( "too few arguments given to matrix(from_range, m, n, { ... })");
+				if constexpr ((sil & silence_t::silence_more) == 0) if (x > m) throw std::invalid_argument("too many arguments given to matrix(from_range, m, n, { ... })");
+				std::size_t i = 0;
+				for (auto&& v : rng) {
+					if (i == m) break;
+					take_n_from<sil, false>(h, n, std::forward<std::ranges::range_reference_t<R>>(v));
+				}
+				return h.release<true>();
+			}
+			else {
+				std::size_t i = 0;
+				for (auto&& v : rng) {
+					if (i == m) {
+						if constexpr ((sil & silence_t::silence_more) == 0) {
+							throw std::invalid_argument("too many arguments given to matrix(from_range, m, n, { ... })");
+						}
+						break;
+					}
+					take_n_from<sil, false>(h, n, std::forward<std::ranges::range_reference_t<R>>(v));
+				}
+				if constexpr ((sil & silence_t::silence_less) == 0) if (x < m) throw std::invalid_argument("too few arguments given to matrix(from_range, m, n, { ... })");
+				return h.release<true>();
+			}
+		}
+
+#		endif
 	}
 	}
 
