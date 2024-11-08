@@ -5,35 +5,29 @@
 #include <string>
 #include <vector>
 #include "bhavesh_matrix_v1.h"
-#include "bhavesh_matrix_v0.h"
-/*
-using namespace std;
 
-class tester {
-public:
-    tester() { puts("tester()"); }
-    tester(int i) { printf("tester(int=%i)\n", i); }
-    tester(const tester&) { puts("tester(const tester&)"); }
-    tester(tester&&) { puts("tester(tester&&)"); }
-    ~tester() { puts("~tester()"); }
-    tester& operator=(const tester&) { puts("operator=(const tester&)"); return *this; }
-    tester& operator=(tester&&) { puts("operator=(tester&&)"); return *this; }
-};
+using bhavesh::matrix;
 
-constexpr int f() {
-    auto x = bhavesh::matrix_detail::create_from_il<bhavesh::silence_both, int>(5, {(int)24648368541, 2, 3, 4, 5});
-    int t = x[0];
-    bhavesh::matrix_detail::destroy_matrix(5, x);
-    return t;
+consteval auto f() {
+    auto m1 = matrix<float>{ 2, 2, {
+        {1, 2},
+        {3, 4}
+    } };
+    matrix<int> m2 = (m1.operator*=(1.1));
+    auto m3 = (m1.operator*(m2)).transpose_inplace();
+    std::array<std::array<float, 2>, 2> ans{
+        m3[0][0], m3[0][1],
+        m3[1][0], m3[1][1]
+    };
+    return ans;
 }
 
-constexpr auto z = f();
+constexpr static auto v = f();
 
-int main()
-{
-    auto* s = bhavesh::matrix_detail::create_from_il<bhavesh::silence_none, tester>(5, { 5, 3, 4, 1, 2 });
-    bhavesh::matrix_detail::destroy_matrix(5, s);
-    std::cin.get();
+int main() {
+    matrix<int> m1 = matrix<int>(1, 2, { 1, 2 });
+    matrix<int> m2 = matrix<int>(1, 2, { 1, 2 });
+    auto m3 = std::move(m1).operator+(std::move(m2));
 }
 
 // Run program: Ctrl + F5 or Debug > Start Without Debugging menu
@@ -46,4 +40,3 @@ int main()
 //   4. Use the Error List window to view errors
 //   5. Go to Project > Add New Item to create new code files, or Project > Add Existing Item to add existing code files to the project
 //   6. In the future, to open this project again, go to File > Open > Project and select the .sln file
-*/
